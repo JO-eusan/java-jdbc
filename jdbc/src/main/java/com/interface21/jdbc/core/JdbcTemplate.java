@@ -23,15 +23,7 @@ public class JdbcTemplate {
     }
 
     public void update(String sql, Object... parameters) {
-        update(sql, pstmt -> {
-            try {
-                for (int i = 0; i < parameters.length; i++) {
-                    pstmt.setObject(i + 1, parameters[i]);
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        });
+        update(sql, bindParameters(parameters));
     }
 
     public void update(String sql, Consumer<PreparedStatement> parameterSetter) {
@@ -48,15 +40,7 @@ public class JdbcTemplate {
     }
 
     public <T> List<T> query(String sql, Function<ResultSet, T> rowMapper, Object... parameters) {
-        return query(sql, pstmt -> {
-            try {
-                for (int i = 0; i < parameters.length; i++) {
-                    pstmt.setObject(i + 1, parameters[i]);
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }, rowMapper);
+        return query(sql, bindParameters(parameters), rowMapper);
     }
 
     public <T> List<T> query(String sql, Consumer<PreparedStatement> parameterSetter,
@@ -95,5 +79,17 @@ public class JdbcTemplate {
             return null;
         }
         return results.getFirst();
+    }
+
+    private Consumer<PreparedStatement> bindParameters(Object... parameters) {
+        return preparedStatement -> {
+            for (int i = 0; i < parameters.length; i++) {
+                try {
+                    preparedStatement.setObject(i + 1, parameters[i]);
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
     }
 }
