@@ -1,13 +1,12 @@
 package com.interface21.jdbc.core;
 
+import com.interface21.dao.DataAccessException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
-import java.util.function.Function;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,69 +25,55 @@ public class JdbcTemplate {
         update(sql, bindParameters(parameters));
     }
 
-    public void update(String sql, Consumer<PreparedStatement> parameterSetter) {
+    public void update(String sql, PreparedStatementSetter setter) {
         try (Connection con = dataSource.getConnection();
              PreparedStatement pstmt = con.prepareStatement(sql)) {
 
             log.debug("query : {}", sql);
-            parameterSetter.accept(pstmt);
+            setter.setValues(pstmt);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             log.error(e.getMessage(), e);
-            throw new RuntimeException(e);
+            throw new DataAccessException(e);
         }
     }
 
-    public <T> List<T> query(String sql, Function<ResultSet, T> rowMapper, Object... parameters) {
-        return query(sql, bindParameters(parameters), rowMapper);
+    public <T> List<T> query(String sql, RowMapper<T> mapper, Object... parameters) {
+        return query(sql, bindParameters(parameters), mapper);
     }
 
-    public <T> List<T> query(String sql, Consumer<PreparedStatement> parameterSetter,
-                             Function<ResultSet, T> rowMapper) {
+    public <T> List<T> query(String sql, PreparedStatementSetter setter, RowMapper<T> mapper) {
         try (Connection con = dataSource.getConnection();
              PreparedStatement pstmt = con.prepareStatement(sql)) {
 
             log.debug("query : {}", sql);
-            parameterSetter.accept(pstmt);
+            setter.setValues(pstmt);
 
-            try (final var rs = pstmt.executeQuery()) {
-                final var results = new ArrayList<T>();
+            try (ResultSet rs = pstmt.executeQuery()) {
+                List<T> results = new ArrayList<>();
                 while (rs.next()) {
-                    results.add(rowMapper.apply(rs));
+                    results.add(mapper.mapRow(rs));
                 }
                 return results;
             }
         } catch (SQLException e) {
             log.error(e.getMessage(), e);
-            throw new RuntimeException(e);
+            throw new DataAccessException(e);
         }
     }
 
-    public <T> T queryForObject(String sql, Consumer<PreparedStatement> parameterSetter,
-                                Function<ResultSet, T> rowMapper) {
-        var results = query(sql, parameterSetter, rowMapper);
+    public <T> T queryForObject(String sql, RowMapper<T> mapper, Object... parameters) {
+        List<T> results = query(sql, mapper, parameters);
         if (results.isEmpty()) {
             return null;
         }
         return results.getFirst();
     }
 
-    public <T> T queryForObject(String sql, Function<ResultSet, T> rowMapper, Object... parameters) {
-        var results = query(sql, rowMapper, parameters);
-        if (results.isEmpty()) {
-            return null;
-        }
-        return results.getFirst();
-    }
-
-    private Consumer<PreparedStatement> bindParameters(Object... parameters) {
-        return preparedStatement -> {
+    private PreparedStatementSetter bindParameters(Object... parameters) {
+        return pstmt -> {
             for (int i = 0; i < parameters.length; i++) {
-                try {
-                    preparedStatement.setObject(i + 1, parameters[i]);
-                } catch (SQLException e) {
-                    throw new RuntimeException(e);
-                }
+                pstmt.setObject(i + 1, parameters[i]);
             }
         };
     }
