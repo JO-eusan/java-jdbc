@@ -21,14 +21,12 @@ public class JdbcTemplate {
         this.dataSource = dataSource;
     }
 
-    public void update(String sql, Object... parameters) {
-        update(sql, bindParameters(parameters));
+    public void update(Connection connection, String sql, Object... parameters) {
+        update(connection, sql, bindParameters(parameters));
     }
 
-    public void update(String sql, PreparedStatementSetter setter) {
-        try (Connection con = dataSource.getConnection();
-             PreparedStatement pstmt = con.prepareStatement(sql)) {
-
+    public void update(Connection connection, String sql, PreparedStatementSetter setter) {
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             log.debug("query : {}", sql);
             setter.setValues(pstmt);
             pstmt.executeUpdate();
