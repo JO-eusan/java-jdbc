@@ -26,61 +26,40 @@ public class UserService {
         return userDao.findById(id);
     }
 
-    public void insert(final User user) {
-        Connection connection = null;
-        try {
-            connection = dataSource.getConnection();
+    public void insert(User user) {
+        executeTransaction(connection -> userDao.insert(connection, user));
+    }
+
+    public void changePassword(long id, String newPassword, String createBy) {
+        executeTransaction(connection -> {
+            User user = findById(id);
+            user.changePassword(newPassword);
+            userDao.update(connection, user);
+            userHistoryDao.log(connection, new UserHistory(user, createBy));
+        });
+    }
+
+    private void executeTransaction(TransactionOperation operation) {
+        try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
-
-            userDao.insert(connection, user);
-
-            connection.commit();
-        } catch (Exception e) {
-            if (connection != null) {
+            try {
+                operation.execute(connection);
+                connection.commit();
+            } catch (Exception e) {
                 try {
                     connection.rollback();
                 } catch (SQLException rollbackEx) {
                     throw new DataAccessException("Rollback failed", rollbackEx);
                 }
+                throw new DataAccessException("Transaction failed", e);
             }
-            throw new DataAccessException("Insert transaction failed", e);
-        } finally {
-            if (connection != null) {
-                try {
-                    connection.close();
-                } catch (SQLException ignored) {}
-            }
+        } catch (SQLException e) {
+            throw new DataAccessException("Connection error", e);
         }
     }
 
-    public void changePassword(final long id, final String newPassword, final String createBy) {
-        Connection connection = null;
-        try {
-            connection = dataSource.getConnection();
-            connection.setAutoCommit(false);
-
-            final var user = findById(id);
-            user.changePassword(newPassword);
-
-            userDao.update(connection, user);
-            userHistoryDao.log(connection, new UserHistory(user, createBy));
-
-            connection.commit();
-        } catch (Exception e) {
-            if (connection != null) {
-                try {
-                    connection.rollback();
-                } catch (SQLException rollbackEx) {
-                    throw new DataAccessException("Rollback failed", rollbackEx);
-                }
-            }
-            throw new DataAccessException("Transaction failed", e);
-        } finally {
-            if (connection != null) {
-                try {
-                    connection.close();
-                } catch (SQLException ignored) {}
-            }
-        }
+    @FunctionalInterface
+    private interface TransactionOperation {
+        void execute(Connection connection) throws Exception;
     }
 }
