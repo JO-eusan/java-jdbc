@@ -22,6 +22,10 @@ public class UserService {
         this.dataSource = DataSourceConfig.getInstance();
     }
 
+    public User findById(Connection connection, final long id) {
+        return userDao.findById(connection, id);
+    }
+
     public User findById(final long id) {
         return userDao.findById(id);
     }
@@ -32,7 +36,7 @@ public class UserService {
 
     public void changePassword(long id, String newPassword, String createBy) {
         executeTransaction(connection -> {
-            User user = findById(id);
+            User user = findById(connection, id);
             user.changePassword(newPassword);
             userDao.update(connection, user);
             userHistoryDao.log(connection, new UserHistory(user, createBy));
