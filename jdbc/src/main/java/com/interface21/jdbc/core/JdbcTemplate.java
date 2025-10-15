@@ -36,6 +36,20 @@ public class JdbcTemplate {
         }
     }
 
+    public void update(String sql, Object... parameters) {
+        update(sql, bindParameters(parameters));
+    }
+
+    public void update(String sql, PreparedStatementSetter setter) {
+        try (Connection con = dataSource.getConnection()) {
+            con.setAutoCommit(true);
+            update(con, sql, setter);
+        } catch (SQLException e) {
+            log.error(e.getMessage(), e);
+            throw new DataAccessException(e);
+        }
+    }
+
     public <T> List<T> query(String sql, RowMapper<T> mapper, Object... parameters) {
         return query(sql, bindParameters(parameters), mapper);
     }

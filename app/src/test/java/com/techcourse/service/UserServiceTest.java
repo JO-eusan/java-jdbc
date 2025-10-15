@@ -26,13 +26,7 @@ class UserServiceTest {
 
         DatabasePopulatorUtils.execute(DataSourceConfig.getInstance());
         final var user = new User("gugu", "password", "hkkang@woowahan.com");
-        try (var con = DataSourceConfig.getInstance().getConnection()) {
-            con.setAutoCommit(false);
-            userDao.insert(con, user);
-            con.commit();
-        } catch (SQLException e) {
-            throw new DataAccessException();
-        }
+        userDao.insert(user);
     }
 
     @Test

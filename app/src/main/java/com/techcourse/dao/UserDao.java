@@ -29,9 +29,19 @@ public class UserDao {
         jdbcTemplate.update(connection, sql, user.getAccount(), user.getPassword(), user.getEmail());
     }
 
+    public void insert(User user) {
+        final var sql = "insert into users (account, password, email) values (?, ?, ?)";
+        jdbcTemplate.update(sql, user.getAccount(), user.getPassword(), user.getEmail());
+    }
+
     public void update(Connection connection, User user) {
         final var sql = "update users set password = ? where id = ?";
         jdbcTemplate.update(connection, sql, user.getPassword(), user.getId());
+    }
+
+    public void update(User user) {
+        final var sql = "update users set password = ? where id = ?";
+        jdbcTemplate.update(sql, user.getPassword(), user.getId());
     }
 
     public List<User> findAll() {

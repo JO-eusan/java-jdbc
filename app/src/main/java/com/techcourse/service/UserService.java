@@ -27,7 +27,7 @@ public class UserService {
     }
 
     public void insert(User user) {
-        executeTransaction(connection -> userDao.insert(connection, user));
+        userDao.insert(user);
     }
 
     public void changePassword(long id, String newPassword, String createBy) {
