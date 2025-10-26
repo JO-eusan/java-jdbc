@@ -1,6 +1,8 @@
 package com.techcourse.service;
 
 import com.interface21.dao.DataAccessException;
+import com.interface21.jdbc.datasource.DataSourceUtils;
+import com.interface21.transaction.support.TransactionSynchronizationManager;
 import com.techcourse.config.DataSourceConfig;
 import com.techcourse.dao.UserDao;
 import com.techcourse.dao.UserHistoryDao;
@@ -22,10 +24,6 @@ public class UserService {
         this.dataSource = DataSourceConfig.getInstance();
     }
 
-    public User findById(Connection connection, final long id) {
-        return userDao.findById(connection, id);
-    }
-
     public User findById(final long id) {
         return userDao.findById(id);
     }
@@ -35,35 +33,42 @@ public class UserService {
     }
 
     public void changePassword(long id, String newPassword, String createBy) {
-        executeTransaction(connection -> {
-            User user = findById(connection, id);
+        executeTransaction(() -> {
+            User user = findById(id);
             user.changePassword(newPassword);
-            userDao.update(connection, user);
-            userHistoryDao.log(connection, new UserHistory(user, createBy));
+            userDao.update(user);
+            userHistoryDao.log(new UserHistory(user, createBy));
         });
     }
 
     private void executeTransaction(TransactionOperation operation) {
-        try (Connection connection = dataSource.getConnection()) {
+        Connection connection = DataSourceUtils.getConnection(dataSource);
+        try {
             connection.setAutoCommit(false);
+            TransactionSynchronizationManager.bindResource(dataSource, connection);
+            operation.execute();
+            connection.commit();
+        } catch (Exception e) {
+            rollback(connection);
+            throw new DataAccessException("Transaction failed", e);
+        } finally {
+            TransactionSynchronizationManager.unbindResource(dataSource);
+            DataSourceUtils.releaseConnection(connection, dataSource);
+        }
+    }
+
+    private void rollback(Connection connection) {
+        if (connection != null) {
             try {
-                operation.execute(connection);
-                connection.commit();
-            } catch (Exception e) {
-                try {
-                    connection.rollback();
-                } catch (SQLException rollbackEx) {
-                    throw new DataAccessException("Rollback failed", rollbackEx);
-                }
-                throw new DataAccessException("Transaction failed", e);
+                connection.rollback();
+            } catch (SQLException e) {
+                throw new DataAccessException("Rollback failed", e);
             }
-        } catch (SQLException e) {
-            throw new DataAccessException("Connection error", e);
         }
     }
 
     @FunctionalInterface
     private interface TransactionOperation {
-        void execute(Connection connection) throws Exception;
+        void execute() throws Exception;
     }
 }
