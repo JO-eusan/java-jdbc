@@ -34,7 +34,6 @@ public class TxUserService implements UserService {
         Connection connection = DataSourceUtils.getConnection(dataSource);
         try {
             connection.setAutoCommit(false);
-            TransactionSynchronizationManager.bindResource(dataSource, connection);
             userService.changePassword(id, newPassword, createBy);
             connection.commit();
         } catch (Exception e) {
